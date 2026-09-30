@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Document Q&A</title>
+<style>
+  body{font-family:system-ui,sans-serif;max-width:720px;margin:30px auto;padding:0 16px;background:#f6f7f9;color:#222}
+  .card{background:#fff;border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 1px 4px #0001}
+  button{background:#2563eb;color:#fff;border:0;padding:9px 16px;border-radius:8px;cursor:pointer}
+  button:disabled{opacity:.5}
+  input[type=text]{flex:1;padding:9px;border:1px solid #ccc;border-radius:8px}
+  #chat{min-height:200px;max-height:420px;overflow:auto;margin-bottom:12px}
+  .msg{padding:8px 12px;border-radius:10px;margin:6px 0;white-space:pre-wrap;max-width:85%}
+  .user{background:#dbeafe;margin-left:auto}
+  .bot{background:#eee}
+  .row{display:flex;gap:8px}
+</style>
+</head>
+<body>
+<h2>📄 Document Q&A</h2>
+
+<div class="card">
+  <b>1. Document upload karein</b><br><br>
+  <input type="file" id="file" accept=".pdf,.txt,.md,.docx,.csv,.json">
+  <button id="upBtn" onclick="upload()">Upload</button>
+  <div id="upStatus" style="margin-top:8px;color:#555"></div>
+</div>
+
+<div class="card">
+  <b>2. Sawal poochein</b>
+  <div id="chat"></div>
+  <div class="row">
+    <input type="text" id="q" placeholder="Document ke baare mein sawal..." onkeydown="if(event.key==='Enter')ask()">
+    <button id="askBtn" onclick="ask()" disabled>Send</button>
+  </div>
+</div>
+
+<script>
+let docId = null;
+const chat = document.getElementById('chat');
+
+function add(text, cls){
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls; d.textContent = text;
+  chat.appendChild(d); chat.scrollTop = chat.scrollHeight; return d;
+}
+
+async function upload(){
+  const f = document.getElementById('file').files[0];
+  if(!f){ return alert('Pehle file select karein'); }
+  const btn = document.getElementById('upBtn'), st = document.getElementById('upStatus');
+  btn.disabled = true; st.textContent = 'Upload aur indexing ho rahi hai...';
+  const fd = new FormData(); fd.append('file', f);
+  try{
+    const r = await fetch('/upload', {method:'POST', body:fd});
+    const j = await r.json();
+    if(!r.ok) throw new Error(j.detail || 'Upload fail');
+    docId = j.doc_id;
+    st.textContent = '✅ ' + j.filename + ' ready hai. Ab sawal poochein.';
+    document.getElementById('askBtn').disabled = false;
+    chat.innerHTML = '';
+  }catch(e){ st.textContent = '❌ ' + e.message; }
+  btn.disabled = false;
+}
+
+async function ask(){
+  const qi = document.getElementById('q'), q = qi.value.trim();
+  if(!q || !docId) return;
+  qi.value = ''; add(q, 'user');
+  const wait = add('soch raha hoon...', 'bot');
+  try{
+    const r = await fetch('/ask', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({doc_id: docId, question: q})});
+    const j = await r.json();
+    wait.textContent = r.ok ? j.answer : ('❌ ' + (j.detail || 'Error'));
+  }catch(e){ wait.textContent = '❌ ' + e.message; }
+}
+</script>
+</body>
+</html>
